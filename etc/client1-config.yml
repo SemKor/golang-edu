@@ -1,0 +1,4 @@
+mode: client
+port: 8081
+host: localhost
+clientName: cl1
