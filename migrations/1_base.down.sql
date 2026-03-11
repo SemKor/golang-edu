@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS go_migrations;
+DROP TABLE IF EXISTS widgets;
