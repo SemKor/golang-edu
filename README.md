@@ -11,34 +11,16 @@ Description: Rich Go language support for Visual Studio Code <br>
 - Установить платформу для контейнеризации приложений - https://www.docker.com/products/docker-desktop/
 
 ## Учебные материалы и задания
-
----
-#### Вам необходимо сделать <b>"fork"</b> данного репозитория к себе в приватный аккаунт.
-
-![git1.png](etc%2Fgit1.png)
-
----
-#### Выбрать свой namespace: 
-![git2.png](etc%2Fgit2.png)
-
----
-#### Предоставить доступы к fork-у куратору и ментору:
-![git3.jpg](etc%2Fgit3.jpg)
-
----
-![git4.jpg](etc%2Fgit4.jpg)
-
----
-#### Решать каждый урок в отдельной ветке, созданной из ветки с условием урока:
+#### Сделать форк этого репозитория и решать каждый урок в отдельной ветке, созданной из ветки с условием урока:
 Например, ветвимся от **task1** в **sol1** и при окончании работы над заданием <br>
-создаем **Merge Request** из **sol1** в **task1**, поставив **Reviewer**-ом своего ментора. <br>
+создаем **Merge Request** из **sol1** в **task1**<br>
 
 ---
 ### Список уроков по веткам:
-### [Урок 1 - Команды и аргументы](https://gitlab.digital-spirit.ru/golang/education/-/tree/task1)
-### [Урок 2 - Работа с БД](https://gitlab.digital-spirit.ru/golang/education/-/tree/task2)
-### [Урок 3 - Конкурентность. Горутины и способы их синхронизации](https://gitlab.digital-spirit.ru/golang/education/-/tree/task3)
-### [Урок 4 - Транспортные протоколы. Потокобезопасные структуры. Логирование](https://gitlab.digital-spirit.ru/golang/education/-/tree/task4)
-### [Урок 5 - CRUD. Серверная часть enterprise-приложения](https://gitlab.digital-spirit.ru/golang/education/-/tree/task5)
-### [Урок 5.1 - CRUD. Авто-тесты](https://gitlab.digital-spirit.ru/golang/education/-/tree/task5_1)
-### [Урок 5.2 - CRUD. Работа с ошибками](https://gitlab.digital-spirit.ru/golang/education/-/tree/task5_2)
+### [Урок 1 - Команды и аргументы](https://github.com/Khayznikovth/golang-edu/tree/task1)
+### [Урок 2 - Работа с БД](https://github.com/Khayznikovth/golang-edu/tree/task2)
+### [Урок 3 - Конкурентность. Горутины и способы их синхронизации](https://github.com/Khayznikovth/golang-edu/tree/task3)
+### [Урок 4 - Транспортные протоколы. Потокобезопасные структуры. Логирование](https://github.com/Khayznikovth/golang-edu/tree/task4)
+### [Урок 5 - CRUD. Серверная часть enterprise-приложения](https://github.com/Khayznikovth/golang-edu/tree/task5)
+### [Урок 5.1 - CRUD. Авто-тесты](https://github.com/Khayznikovth/golang-edu/tree/task5_1)
+### [Урок 5.2 - CRUD. Работа с ошибками](https://github.com/Khayznikovth/golang-edu/tree/task5_2)
