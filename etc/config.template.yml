@@ -1,0 +1,23 @@
+mode: api
+server:
+  host: localhost
+  port: 7071
+log:
+  level: debug
+  format: text
+  title: api
+testUser:
+  allowed: true
+  name: test
+  password: test
+psql:
+  user: "postgres"
+  pass: "postgres"
+  host: "localhost"
+  port: 5432
+  dbname: "task_5"
+  sslmode: "disable"
+  blacklist:
+    - test
+    - gopg_migrations
+    - db_version

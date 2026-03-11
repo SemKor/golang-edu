@@ -1,0 +1,469 @@
+swagger: '2.0'
+info:
+  description: REST API e-store
+  title: E-store
+  version: v1
+host: localhost:7070
+schemes:
+  - http
+basePath: /v1
+paths:
+  /product/{id}:
+    get:
+      summary: Получить "карточку" товара (просмотр информации по товару - свойства товара, стоимость, скидка и т.п.)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: integer
+          description: Идентификатор товара
+      responses:
+        '200':
+          description: В ответ отдаем все свойства товара какие у нас есть, плюс цену и скидку, если таковая имеется.
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - products
+    delete:
+      summary: Удалить товар
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: integer
+          description: Идентификатор товара
+      description: Помечаем товар как удаленный выставляя deleted_at в БД как время удаления товара. Товар должен перестать быть доступен на получение в списках и карточках товара
+      responses:
+        '200':
+          description: В ответ отдаем все свойства товара какие у нас есть, плюс цену и скидку, если таковая имеется.
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - products
+  /products:
+    get:
+      summary: Получить список товаров
+      produces:
+        - application/json
+      parameters:
+        - in: query
+          name: name
+          description: поиск по наименованию товара (реализизация поиска по вхождению подстроки будет плюсом)
+          type: string
+        - in: query
+          name: category
+          description: поиск по категориям
+          type: array
+          items:
+            type: string
+        - in: query
+          name: minPrice
+          description: минимальная цена
+          type: number
+        - in: query
+          name: maxPrice
+          description: максимальная цена
+          type: number
+        - in: query
+          name: minDiscount
+          description: минимальная скидка
+          type: number
+        - in: query
+          name: maxDiscount
+          description: максимальная скидка
+          type: number
+        - in: query
+          name: offset
+          description: с какого по счету элемента отдать результат
+          type: integer
+        - in: query
+          name: count
+          description: сколько значений должен содержать результат
+          type: integer
+      responses:
+        '200':
+          description: В ответ отдаем список товаров и количество товаров, удовлетворяющих выборке
+          schema:
+            type: object
+            properties:
+              products:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    category:
+                      type: string
+                    price:
+                      type: number
+                    discount:
+                      type: number
+              totalCount:
+                type: integer
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - products
+    post:
+      summary: Добавить товары
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: products
+          description: список продуктов со свойствами для добавления
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                price:
+                  type: number
+                  format: double
+                premiumDiscount:
+                  type: number
+                  format: double
+                categoryDiscount:
+                  type: number
+                  format: double
+      responses:
+        '201':
+          description: OK
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - products
+    put:
+      summary: Обновить товары
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          name: products
+          description: список продуктов со свойствами для добавления
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                price:
+                  type: number
+                  format: double
+                premiumDiscount:
+                  type: number
+                  format: double
+                categoryDiscount:
+                  type: number
+                  format: double
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - products
+  /register:
+    post:
+      summary: Зарегистрировать пользователя
+      consumes:
+        - application/json
+      parameters:
+        - in: body
+          description: данные пользователя
+          name: new user
+          schema:
+            type: object
+            properties:
+              login:
+                type: string
+              password:
+                type: string
+              firstname:
+                type: string
+              lastname:
+                type: string
+              email:
+                type: string
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - users
+  /user:
+    get:
+      summary: Получить информацию о текущем пользователе
+      responses:
+        '200':
+          description: В ответ отдаем свойства пользователя
+          schema:
+            type: object
+            properties:
+              firstname:
+                type: string
+              lastname:
+                type: string
+              hasPremium:
+                type: boolean
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - users
+  /pay:
+    post:
+      summary: Общий метод для оплаты
+      description: Метод позволяет оплачивать как подписку, так и корзину
+      parameters:
+        - in: body
+          description: данные оплаты
+          name: payment
+          schema:
+            type: object
+            properties:
+              paymentType:
+                type: string
+                enum: [order, premium]
+              amount:
+                type: number
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - payment
+  /cart:
+    put:
+      summary: Обновить состояние товаров в корзине
+      parameters:
+        - in: body
+          description: состояние корзины
+          name: cart
+          schema:
+            type: object
+            properties:
+              products:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    quantity:
+                      type: integer
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - cart
+    get:
+      summary: Получить корзину товаров пользователя
+      responses:
+        '200':
+          description: В ответ отдаем корзину с товарами
+          schema:
+            type: object
+            properties:
+              products:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    quantity:
+                      type: integer
+                    price:
+                      type: number
+                    discount:
+                      type: number
+                    amount:
+                      type: number
+              totalAmount:
+                type: number
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - cart
+  /order:
+    post:
+      summary: Разместить заказ
+      parameters:
+        - in: body
+          description: заказ
+          name: order
+          schema:
+            type: object
+            properties:
+              address:
+                type: string
+      description: Если корзина непустая - создаем заказ из содержимого корзины и параметров доставки
+      responses:
+        '200':
+          description: В ответ отдаем идентификатор заказа
+          schema:
+            type: object
+            properties:
+              id:
+                type: integer
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - orders
+  /order/{id}:
+    get:
+      summary: Получить информацию по заказу
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: integer
+          description: Идентификатор заказа
+      responses:
+        '200':
+          description: В ответ отдаем свойства заказа
+          schema:
+            type: object
+            properties:
+              id:
+                type: integer
+              createdAt:
+                type: string
+                format: date-time
+              products:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    quantity:
+                      type: integer
+                    price:
+                      type: number
+                    discount:
+                      type: number
+                    amount:
+                      type: number
+              totalAmount:
+                type: number
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - orders
+    delete:
+      summary: Отменить заказ
+      parameters:
+        - in: path
+          name: id
+          required: true
+          type: integer
+          description: Идентификатор заказа
+      responses:
+        '200':
+          description: ОК
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - orders
+  /orders:
+    get:
+      summary: Получить историю заказов
+      responses:
+        '200':
+          description: В ответ отдаем свойства заказа
+          schema:
+            type: object
+            properties:
+              orders:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    createdAt:
+                      type: string
+                      format: date-time
+        '400':
+          description: Ответ на запрос в случае некорректного запроса клиента (неверно заполнены/незаполнены необходимые параметры)
+        '401':
+          description: Ответ на неавторизованный запрос
+        '500':
+          description: Ответ на внутреннюю ошибку сервера
+      tags:
+        - orders
+securityDefinitions:
+  oAuth:
+    type: oauth2
+    description: Авторизация
+    flow: password
+    tokenUrl: http://127.0.0.1:7071/v1/token
+    scopes:
+      read: Grants read access
+      write: Grants write access
+
+security:
+  - oAuth: [read, write]
