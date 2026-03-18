@@ -12,6 +12,5 @@ func Fibonacci(n int) int {
 		a, b = b, a+b
 
 	}
-
 	return b
 }
