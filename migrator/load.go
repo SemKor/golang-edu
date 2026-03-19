@@ -15,7 +15,6 @@ type Migration struct {
 	DownFile string
 }
 
-// LoadMigrations читает все SQL-файлы из папки и сортирует их по версии
 func LoadMigrations(dir string) []Migration {
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -52,7 +51,6 @@ func LoadMigrations(dir string) []Migration {
 		migs = append(migs, *m)
 	}
 
-	// Сортируем по возрастанию версии
 	sort.Slice(migs, func(i, j int) bool { return migs[i].Version < migs[j].Version })
 	return migs
 }

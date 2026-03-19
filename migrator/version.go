@@ -7,9 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// GetCurrentVersion возвращает текущую версию миграций из таблицы
 func GetCurrentVersion(conn *pgx.Conn) int {
-	// Создаём таблицу, если её нет
 	_, err := conn.Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS go_migrations (
 			id SERIAL PRIMARY KEY,
@@ -30,7 +28,6 @@ func GetCurrentVersion(conn *pgx.Conn) int {
 	return version
 }
 
-// Version выводит текущую версию миграций
 func Version(conn *pgx.Conn) {
 	current := GetCurrentVersion(conn)
 	println("Current migration version:", current)

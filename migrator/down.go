@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Down откатывает последнюю применённую миграцию
 func Down(conn *pgx.Conn, dir string) {
 	current := GetCurrentVersion(conn)
 	if current == 0 {
@@ -31,7 +30,6 @@ func Down(conn *pgx.Conn, dir string) {
 
 	ApplyMigration(conn, migToDown.DownFile)
 
-	// удаляем запись о текущей версии
 	_, err := conn.Exec(context.Background(), "DELETE FROM go_migrations WHERE version=$1", current)
 	if err != nil {
 		log.Fatal("Failed to update version after down:", err)

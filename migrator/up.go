@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ApplyMigration выполняет SQL-файл миграции
 func ApplyMigration(conn *pgx.Conn, path string) {
 	sqlBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -23,7 +22,6 @@ func ApplyMigration(conn *pgx.Conn, path string) {
 	println("Applied migration:", path)
 }
 
-// Up применяет все миграции, версия которых больше текущей
 func Up(conn *pgx.Conn, dir string) {
 	current := GetCurrentVersion(conn)
 	migs := LoadMigrations(dir)
