@@ -1,0 +1,6 @@
+db:
+  host: localhost
+  port: 6432
+  user: postgres
+  password: postgres
+  name: labs
