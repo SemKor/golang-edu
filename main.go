@@ -9,11 +9,23 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
+
 	"golang-edu/config"
 	"golang-edu/db"
+	"golang-edu/migrator"
 )
 
 func main() {
+	// Проверяем, передана ли команда
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run main.go [up|down|reset|version]")
+		return
+	}
+
+	cmd := os.Args[1]
+
 	// Загружаем конфиг
 	cfg, err := config.LoadConfig("config/config.yaml")
 	if err != nil {
@@ -24,12 +36,17 @@ func main() {
 	conn := db.Connect(cfg)
 	defer conn.Close(context.Background())
 
-	// Пример запроса
-	var version string
-	err = conn.QueryRow(context.Background(), "SELECT version()").Scan(&version)
-	if err != nil {
-		panic(err)
+	// Выполняем команду
+	switch cmd {
+	case "up":
+		migrator.Up(conn, "migrations")
+	case "down":
+		migrator.Down(conn, "migrations")
+	case "reset":
+		migrator.Reset(conn, "migrations")
+	case "version":
+		migrator.Version(conn)
+	default:
+		fmt.Println("Unknown command:", cmd)
 	}
-
-	println("PostgreSQL version:", version)
 }
