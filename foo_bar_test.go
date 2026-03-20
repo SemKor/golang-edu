@@ -2,13 +2,16 @@ package main
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 )
 
 func TestFooBar(t *testing.T) {
 	var output bytes.Buffer
+	wg := sync.WaitGroup{}
 	want := "FooBarFooBarFooBarFooBarFooBarFooBarFooBarFooBarFooBarFooBar"
-	FooBar(&output)
+	FooBar(&output, &wg)
+	wg.Wait()
 	if want != output.String() {
 		t.Error("got value that mismatch expected - ", output.String())
 	}
