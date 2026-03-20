@@ -35,7 +35,6 @@ func FooBar(w io.Writer, wg *sync.WaitGroup) {
 	n := 10
 	go foo(n, w, wg, fooCh, barCh)
 	go bar(n, w, wg, fooCh, barCh)
-	
 }
 
 func main() {
