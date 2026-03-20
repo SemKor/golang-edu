@@ -15,7 +15,9 @@ import (
 func RunServer(cfg *config.Config) {
 	done := make(chan os.Signal, 1)
 	wg := sync.WaitGroup{}
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGQUIT)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, 
+		//syscall.SIGSTOP, syscall.SIGQUIT
+	)
 	// TODO implement start server to listen to port here
 	logger.Instance().Info("server started", zap.String("host", cfg.Host), zap.Int("port", cfg.Port))
 	// TODO implement routines to process connections here

@@ -14,7 +14,9 @@ import (
 
 func RunClient(cfg *config.Config) {
 	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGQUIT)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, 
+		//syscall.SIGSTOP, //syscall.SIGQUIT
+		)
 	wg := sync.WaitGroup{}
 	// TODO implement dial to server from client
 	logger.Instance().Info("client started", zap.String("host", cfg.Host), zap.Int("port", cfg.Port))

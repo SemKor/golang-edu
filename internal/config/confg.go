@@ -1,5 +1,8 @@
 package config
 
+import ("os"
+	"gopkg.in/yaml.v3"
+)
 type Config struct {
 	Mode       string `yaml:"mode"`
 	LogLevel   string `yaml:"logLevel"`
@@ -9,6 +12,16 @@ type Config struct {
 }
 
 func Init() (*Config, error) {
-	// TODO implement config initialization func
-	panic("not implemented")
+	data, err := os.ReadFile("etc/server-config.yml")
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg Config
+	err = yaml.Unmarshal(data, &cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
 }

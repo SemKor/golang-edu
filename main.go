@@ -17,6 +17,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	
+
+
+	println("MODE:", cfg.Mode)
+	println("HOST:", cfg.Host)
+	println("PORT:", cfg.Port)
+
+
 	logger.Init(cfg)
 	modeFn, ok := modeMap[cfg.Mode]
 	if !ok {
