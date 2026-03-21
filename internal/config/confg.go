@@ -11,8 +11,8 @@ type Config struct {
 	ClientName string `yaml:"clientName"`
 }
 
-func Init() (*Config, error) {
-	data, err := os.ReadFile("etc/server-config.yml")
+func Init(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
