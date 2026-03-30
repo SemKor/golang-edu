@@ -1,8 +1,17 @@
 package model
 
+import "time"
+
 type User struct {
-	Id        int64
-	Login     string
-	Firstname string
-	Lastname  string
+	ID               int64
+	Username         string
+	Email            string
+	PasswordHash     string
+	FirstName        string
+	LastName         string
+	IsPremium        bool
+	PremiumExpiresAt *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
 }
