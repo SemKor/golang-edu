@@ -39,11 +39,15 @@ func NewServer(cfg *config.Config, usecase *domain.Usecase) *Server {
 	base.Get("/user", h.GetUser)
 	base.Get("/products", h.GetProducts)
 	base.Get("/product/:id", h.GetProductByID)
-	base.Put("/cart", h.AddToCart)
+	base.Put("/cart", h.ReplaceCart)
 	base.Get("/cart", h.GetCart)
 	base.Post("/order", h.CreateOrder)
 	base.Get("/order/:id", h.GetOrder)
 	base.Get("/orders", h.GetOrders)
 	base.Post("/pay", h.PayOrder)
+	base.Delete("/order/:id", h.CancelOrder)
+	base.Post("/products", h.CreateProducts)
+	base.Put("/products", h.UpdateProducts)
+	base.Delete("/product/:id", h.DeleteProduct)
 	return &instance
 }

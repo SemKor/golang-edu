@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"task5/internal/domain/model"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"task5/internal/domain/model"
 )
 
 type Usecase struct {
@@ -52,9 +52,13 @@ func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, er
 		return model.User{}, err
 	}
 
+	err = u.userRepo.AssignRoleToUser(ctx, createdUser.ID, "user")
+	if err != nil {
+		return model.User{}, fmt.Errorf("cannot assign default role: %w", err)
+	}
+
 	return createdUser, nil
 }
-
 
 func (u *Usecase) Login(ctx context.Context, username, password string) (string, error) {
 	user, err := u.userRepo.GetUserByUsername(ctx, username)
@@ -100,8 +104,8 @@ func (u *Usecase) GetUserPermissions(ctx context.Context, userID int64) ([]strin
 	return u.userRepo.GetUserPermissions(ctx, userID)
 }
 
-func (u *Usecase) GetProducts(ctx context.Context) ([]model.Product, error) {
-	return u.productRepo.GetProducts(ctx)
+func (u *Usecase) GetProducts(ctx context.Context, filter model.ProductFilter) ([]model.Product, int, error) {
+	return u.productRepo.GetProducts(ctx, filter)
 }
 
 func (u *Usecase) GetProductByID(ctx context.Context, id int64) (model.Product, error) {
@@ -110,10 +114,6 @@ func (u *Usecase) GetProductByID(ctx context.Context, id int64) (model.Product, 
 
 func (u *Usecase) GetCart(ctx context.Context, userID int64) (model.Cart, error) {
 	return u.cartRepo.GetCart(ctx, userID)
-}
-
-func (u *Usecase) AddToCart(ctx context.Context, userID, productID int64, quantity int) error {
-	return u.cartRepo.AddToCart(ctx, userID, productID, quantity)
 }
 
 func (u *Usecase) CreateOrder(ctx context.Context, userID int64, address string) (model.Order, error) {
@@ -131,3 +131,39 @@ func (u *Usecase) GetOrdersByUser(ctx context.Context, userID int64) ([]model.Or
 func (u *Usecase) PayOrder(ctx context.Context, orderID int64) error {
 	return u.orderRepo.PayOrder(ctx, orderID)
 }
+
+func (u *Usecase) GetProductDiscount(ctx context.Context, productID int64, isPremium bool) (float64, error) {
+	return u.productRepo.GetProductDiscount(ctx, productID, isPremium)
+}
+
+func (u *Usecase) CancelOrder(ctx context.Context, orderID int64, userID int64) error {
+	return u.orderRepo.CancelOrder(ctx, orderID, userID)
+}
+
+func (u *Usecase) GetOrderByIDForUser(ctx context.Context, orderID int64, userID int64) (model.Order, error) {
+	return u.orderRepo.GetOrderByIDForUser(ctx, orderID, userID)
+}
+func (u *Usecase) ActivatePremium(ctx context.Context, userID int64) error {
+	expiresAt := time.Now().Add(30 * 24 * time.Hour)
+	return u.userRepo.ActivatePremium(ctx, userID, expiresAt)
+}
+
+func (u *Usecase) CreateProducts(ctx context.Context, products []model.ProductCreateInput) ([]model.Product, error) {
+	return u.productRepo.CreateProducts(ctx, products)
+}
+
+func (u *Usecase) UpdateProducts(ctx context.Context, products []model.ProductUpdateInput) ([]model.Product, error) {
+	return u.productRepo.UpdateProducts(ctx, products)
+}
+
+func (u *Usecase) DeleteProduct(ctx context.Context, id int64) error {
+	return u.productRepo.DeleteProduct(ctx, id)
+}
+
+func (u *Usecase) ReplaceCart(ctx context.Context, userID int64, items []model.CartUpdateItem) error {
+	return u.cartRepo.ReplaceCart(ctx, userID, items)
+}
+
+
+
+

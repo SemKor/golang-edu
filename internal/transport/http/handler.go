@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/generates"
@@ -14,12 +15,10 @@ import (
 	"github.com/go-oauth2/oauth2/v4/store"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt"
-	
 
 	"task5/internal/config"
 	"task5/internal/domain"
 	"task5/internal/domain/model"
-
 )
 
 const (
@@ -118,11 +117,11 @@ func (h *handler) Token(ctx *fiber.Ctx) error {
 
 func (h *handler) Register(ctx *fiber.Ctx) error {
 	var req struct {
-		Username  string `json:"username"`
+		Login     string `json:"login"`
 		Email     string `json:"email"`
 		Password  string `json:"password"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
+		FirstName string `json:"firstname"`
+		LastName  string `json:"lastname"`
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
@@ -131,10 +130,40 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 		})
 	}
 
+	if strings.TrimSpace(req.Login) == "" {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "login is required",
+		})
+	}
+
+	if strings.TrimSpace(req.Email) == "" {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "email is required",
+		})
+	}
+
+	if strings.TrimSpace(req.Password) == "" {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "password is required",
+		})
+	}
+
+	if strings.TrimSpace(req.FirstName) == "" {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "firstname is required",
+		})
+	}
+
+	if strings.TrimSpace(req.LastName) == "" {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "lastname is required",
+		})
+	}
+
 	user := model.User{
-		Username:     req.Username,
+		Username:     req.Login,
 		Email:        req.Email,
-		PasswordHash: req.Password, // пока временно так, потом заменим на hash
+		PasswordHash: req.Password,
 		FirstName:    req.FirstName,
 		LastName:     req.LastName,
 	}
@@ -146,12 +175,8 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 		})
 	}
 
-	return ctx.Status(http.StatusCreated).JSON(fiber.Map{
-		"id":         createdUser.ID,
-		"username":   createdUser.Username,
-		"email":      createdUser.Email,
-		"first_name": createdUser.FirstName,
-		"last_name":  createdUser.LastName,
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"id": createdUser.ID,
 	})
 }
 
@@ -180,24 +205,183 @@ func (h *handler) GetUser(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.Status(http.StatusOK).JSON(fiber.Map{
-		"id":         user.ID,
-		"username":   user.Username,
-		"email":      user.Email,
-		"first_name": user.FirstName,
-		"last_name":  user.LastName,
-		"is_premium": user.IsPremium,
+		"firstname":  user.FirstName,
+		"lastname":   user.LastName,
+		"hasPremium": user.IsPremium,
 	})
 }
 
 func (h *handler) GetProducts(ctx *fiber.Ctx) error {
-	products, err := h.usecase.GetProducts(ctx.Context())
+	userIDRaw := ctx.Locals("user_id")
+
+	idStr, ok := userIDRaw.(string)
+	if !ok {
+		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid token",
+		})
+	}
+
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
+
+	user, err := h.usecase.GetUserByID(ctx.Context(), userID)
+	if err != nil {
+		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "user not found",
+		})
+	}
+
+	var filter model.ProductFilter
+
+	filter.Name = strings.TrimSpace(ctx.Query("name"))
+
+	categoryParams := strings.TrimSpace(ctx.Query("category"))
+	if categoryParams != "" {
+		parts := strings.Split(categoryParams, ",")
+		for _, p := range parts {
+			id, err := strconv.ParseInt(strings.TrimSpace(p), 10, 64)
+			if err != nil {
+				return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid category",
+				})
+			}
+			filter.Category = append(filter.Category, id)
+		}
+	}
+
+	if v := strings.TrimSpace(ctx.Query("minPrice")); v != "" {
+		val, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid minPrice",
+			})
+		}
+		filter.MinPrice = val
+	}
+
+	if v := strings.TrimSpace(ctx.Query("maxPrice")); v != "" {
+		val, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid maxPrice",
+			})
+		}
+		filter.MaxPrice = val
+	}
+
+	var minDiscount *float64
+	if v := strings.TrimSpace(ctx.Query("minDiscount")); v != "" {
+		val, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid minDiscount",
+			})
+		}
+		minDiscount = &val
+	}
+
+	var maxDiscount *float64
+	if v := strings.TrimSpace(ctx.Query("maxDiscount")); v != "" {
+		val, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid maxDiscount",
+			})
+		}
+		maxDiscount = &val
+	}
+
+	offset := 0
+	if v := strings.TrimSpace(ctx.Query("offset")); v != "" {
+		val, err := strconv.Atoi(v)
+		if err != nil || val < 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid offset",
+			})
+		}
+		offset = val
+	}
+
+	count := -1
+	if v := strings.TrimSpace(ctx.Query("count")); v != "" {
+		val, err := strconv.Atoi(v)
+		if err != nil || val < 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid count",
+			})
+		}
+		count = val
+	}
+
+	// Важно:
+	// offset/count здесь не передаем в repository, чтобы totalCount считался
+	// после применения discount-фильтров, а пагинация была последним шагом.
+	filter.Offset = 0
+	filter.Count = 0
+
+	products, _, err := h.usecase.GetProducts(ctx.Context(), filter)
 	if err != nil {
 		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "cannot get products",
 		})
 	}
 
-	return ctx.Status(http.StatusOK).JSON(products)
+	type productResponse struct {
+		ID       int64   `json:"id"`
+		Name     string  `json:"name"`
+		Category int64   `json:"category"`
+		Price    float64 `json:"price"`
+		Discount float64 `json:"discount"`
+	}
+
+	result := make([]productResponse, 0, len(products))
+
+	for _, product := range products {
+		discount, err := h.usecase.GetProductDiscount(ctx.Context(), product.ID, user.IsPremium)
+		if err != nil {
+			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "cannot get product discount",
+			})
+		}
+
+		if minDiscount != nil && discount < *minDiscount {
+			continue
+		}
+		if maxDiscount != nil && discount > *maxDiscount {
+			continue
+		}
+
+		finalPrice := product.Price * (1 - discount/100)
+
+		result = append(result, productResponse{
+			ID:       product.ID,
+			Name:     product.Name,
+			Category: product.CategoryID,
+			Price:    finalPrice,
+			Discount: discount,
+		})
+	}
+
+	totalCount := len(result)
+
+	if offset >= len(result) {
+		result = []productResponse{}
+	} else if offset > 0 {
+		result = result[offset:]
+	}
+
+	if count >= 0 && count < len(result) {
+		result = result[:count]
+	}
+
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"products":   result,
+		"totalCount": totalCount,
+	})
 }
 
 func (h *handler) GetProductByID(ctx *fiber.Ctx) error {
@@ -215,10 +399,51 @@ func (h *handler) GetProductByID(ctx *fiber.Ctx) error {
 		})
 	}
 
-	return ctx.Status(http.StatusOK).JSON(product)
+	userIDRaw := ctx.Locals("user_id")
+	idStr, ok := userIDRaw.(string)
+	if !ok {
+		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid token",
+		})
+	}
+
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
+
+	user, err := h.usecase.GetUserByID(ctx.Context(), userID)
+	if err != nil {
+		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "user not found",
+		})
+	}
+
+	discount, err := h.usecase.GetProductDiscount(ctx.Context(), product.ID, user.IsPremium)
+	if err != nil {
+		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "cannot get product discount",
+		})
+	}
+
+	finalPrice := product.Price * (1 - discount/100)
+
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"id":          product.ID,
+		"name":        product.Name,
+		"description": product.Description,
+		"category_id": product.CategoryID,
+		"price":       finalPrice,
+		"discount":    discount,
+		"is_active":   product.IsActive,
+		"created_at":  product.CreatedAt,
+		"updated_at":  product.UpdatedAt,
+	})
 }
 
-func (h *handler) AddToCart(ctx *fiber.Ctx) error {
+func (h *handler) ReplaceCart(ctx *fiber.Ctx) error {
 	userIDRaw := ctx.Locals("user_id")
 
 	idStr, ok := userIDRaw.(string)
@@ -228,11 +453,18 @@ func (h *handler) AddToCart(ctx *fiber.Ctx) error {
 		})
 	}
 
-	userID, _ := strconv.ParseInt(idStr, 10, 64)
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
 
 	var req struct {
-		ProductID int64 `json:"product_id"`
-		Quantity  int   `json:"quantity"`
+		Products []struct {
+			ID       int64 `json:"id"`
+			Quantity int   `json:"quantity"`
+		} `json:"products"`
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
@@ -241,7 +473,26 @@ func (h *handler) AddToCart(ctx *fiber.Ctx) error {
 		})
 	}
 
-	err := h.usecase.AddToCart(ctx.Context(), userID, req.ProductID, req.Quantity)
+	items := make([]model.CartUpdateItem, 0, len(req.Products))
+	for _, product := range req.Products {
+		if product.ID <= 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid product id",
+			})
+		}
+		if product.Quantity <= 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid quantity",
+			})
+		}
+
+		items = append(items, model.CartUpdateItem{
+			ProductID: product.ID,
+			Quantity:  product.Quantity,
+		})
+	}
+
+	err = h.usecase.ReplaceCart(ctx.Context(), userID, items)
 	if err != nil {
 		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
@@ -261,7 +512,12 @@ func (h *handler) GetCart(ctx *fiber.Ctx) error {
 		})
 	}
 
-	userID, _ := strconv.ParseInt(idStr, 10, 64)
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
 
 	cart, err := h.usecase.GetCart(ctx.Context(), userID)
 	if err != nil {
@@ -270,7 +526,40 @@ func (h *handler) GetCart(ctx *fiber.Ctx) error {
 		})
 	}
 
-	return ctx.Status(http.StatusOK).JSON(cart)
+	type cartProductResponse struct {
+		ID       int64   `json:"id"`
+		Quantity int     `json:"quantity"`
+		Price    float64 `json:"price"`
+		Discount float64 `json:"discount"`
+		Amount   float64 `json:"amount"`
+	}
+
+	products := make([]cartProductResponse, 0, len(cart.Items))
+	var totalAmount float64
+
+	for _, item := range cart.Items {
+		if item.Product == nil {
+			continue
+		}
+
+		price := item.Product.Price
+		amount := price * float64(item.Quantity)
+
+		products = append(products, cartProductResponse{
+			ID:       item.ProductID,
+			Quantity: item.Quantity,
+			Price:    price,
+			Discount: item.DiscountPercent,
+			Amount:   amount,
+		})
+
+		totalAmount += amount
+	}
+
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"products":    products,
+		"totalAmount": totalAmount,
+	})
 }
 
 func (h *handler) CreateOrder(ctx *fiber.Ctx) error {
@@ -283,7 +572,12 @@ func (h *handler) CreateOrder(ctx *fiber.Ctx) error {
 		})
 	}
 
-	userID, _ := strconv.ParseInt(idStr, 10, 64)
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
 
 	var req struct {
 		Address string `json:"address"`
@@ -295,32 +589,94 @@ func (h *handler) CreateOrder(ctx *fiber.Ctx) error {
 		})
 	}
 
-	order, err := h.usecase.CreateOrder(ctx.Context(), userID, req.Address)
-	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+	if strings.TrimSpace(req.Address) == "" {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "address is required",
 		})
 	}
 
-	return ctx.Status(http.StatusCreated).JSON(order)
+	order, err := h.usecase.CreateOrder(ctx.Context(), userID, req.Address)
+	if err != nil {
+		switch err.Error() {
+		case "cart not found", "cart is empty":
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+	}
+
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"id": order.ID,
+	})
 }
 
 func (h *handler) GetOrder(ctx *fiber.Ctx) error {
-	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
+	userIDRaw := ctx.Locals("user_id")
+
+	idStr, ok := userIDRaw.(string)
+	if !ok {
+		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid token",
+		})
+	}
+
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
+
+	orderID, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
 		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid id",
 		})
 	}
 
-	order, err := h.usecase.GetOrderByID(ctx.Context(), id)
+	order, err := h.usecase.GetOrderByIDForUser(ctx.Context(), orderID, userID)
 	if err != nil {
 		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
 			"error": "order not found",
 		})
 	}
 
-	return ctx.Status(http.StatusOK).JSON(order)
+	type orderProductResponse struct {
+		ID       int64   `json:"id"`
+		Quantity int     `json:"quantity"`
+		Price    float64 `json:"price"`
+		Discount float64 `json:"discount"`
+		Amount   float64 `json:"amount"`
+	}
+
+	products := make([]orderProductResponse, 0, len(order.Items))
+	var totalAmount float64
+
+	for _, item := range order.Items {
+		finalPrice := item.Price * (1 - item.DiscountPercent/100)
+		amount := finalPrice * float64(item.Quantity)
+
+		products = append(products, orderProductResponse{
+			ID:       item.ProductID,
+			Quantity: item.Quantity,
+			Price:    finalPrice,
+			Discount: item.DiscountPercent,
+			Amount:   amount,
+		})
+
+		totalAmount += amount
+	}
+
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"id":          order.ID,
+		"createdAt":   order.CreatedAt,
+		"products":    products,
+		"totalAmount": totalAmount,
+	})
 }
 
 func (h *handler) GetOrders(ctx *fiber.Ctx) error {
@@ -333,7 +689,12 @@ func (h *handler) GetOrders(ctx *fiber.Ctx) error {
 		})
 	}
 
-	userID, _ := strconv.ParseInt(idStr, 10, 64)
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
 
 	orders, err := h.usecase.GetOrdersByUser(ctx.Context(), userID)
 	if err != nil {
@@ -342,12 +703,45 @@ func (h *handler) GetOrders(ctx *fiber.Ctx) error {
 		})
 	}
 
-	return ctx.Status(http.StatusOK).JSON(orders)
+	type orderResponse struct {
+		ID        int64     `json:"id"`
+		CreatedAt time.Time `json:"createdAt"`
+	}
+
+	result := make([]orderResponse, 0, len(orders))
+	for _, order := range orders {
+		result = append(result, orderResponse{
+			ID:        order.ID,
+			CreatedAt: order.CreatedAt,
+		})
+	}
+
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"orders": result,
+	})
 }
 
 func (h *handler) PayOrder(ctx *fiber.Ctx) error {
+	userIDRaw := ctx.Locals("user_id")
+
+	idStr, ok := userIDRaw.(string)
+	if !ok {
+		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid token",
+		})
+	}
+
+	userID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
+
 	var req struct {
-		OrderID int64 `json:"order_id"`
+		PaymentType string  `json:"paymentType"`
+		Amount      float64 `json:"amount"`
+		OrderID     int64   `json:"order_id"`
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
@@ -356,18 +750,300 @@ func (h *handler) PayOrder(ctx *fiber.Ctx) error {
 		})
 	}
 
-	if req.OrderID <= 0 {
+	if req.Amount < 0 {
 		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid order_id",
+			"error": "invalid amount",
 		})
 	}
 
-	err := h.usecase.PayOrder(ctx.Context(), req.OrderID)
+	switch req.PaymentType {
+	case "order":
+		if req.OrderID <= 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid order_id",
+			})
+		}
+
+		order, err := h.usecase.GetOrderByIDForUser(ctx.Context(), req.OrderID, userID)
+		if err != nil {
+			return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
+				"error": "order not found",
+			})
+		}
+
+		if order.Status == "cancelled" {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "cancelled order cannot be paid",
+			})
+		}
+
+		if order.Status == "paid" {
+			return ctx.SendStatus(http.StatusOK)
+		}
+
+		if req.Amount != order.TotalPrice {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid payment amount",
+			})
+		}
+
+		err = h.usecase.PayOrder(ctx.Context(), req.OrderID)
+		if err != nil {
+			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+
+		return ctx.SendStatus(http.StatusOK)
+
+	case "premium":
+		if req.Amount <= 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid amount",
+			})
+		}
+
+		err := h.usecase.ActivatePremium(ctx.Context(), userID)
+		if err != nil {
+			if err.Error() == "user not found" {
+				return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
+					"error": err.Error(),
+				})
+			}
+
+			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+
+		return ctx.SendStatus(http.StatusOK)
+
+	default:
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid paymentType",
+		})
+	}
+}
+
+func (h *handler) CancelOrder(ctx *fiber.Ctx) error {
+	userIDRaw := ctx.Locals("user_id")
+
+	idStr, ok := userIDRaw.(string)
+	if !ok {
+		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid token",
+		})
+	}
+
+	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
+
+	orderID, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid order id",
+		})
+	}
+
+	err = h.usecase.CancelOrder(ctx.Context(), orderID, userID)
+	if err != nil {
+		switch err.Error() {
+		case "order not found":
+			return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case "paid order cannot be cancelled":
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+	}
+
+	return ctx.SendStatus(http.StatusOK)
+}
+
+func (h *handler) CreateProducts(ctx *fiber.Ctx) error {
+	var req []struct {
+		Name             string  `json:"name"`
+		Description      string  `json:"description"`
+		Price            float64 `json:"price"`
+		CategoryID       int64   `json:"categoryId"`
+		PremiumDiscount  float64 `json:"premiumDiscount"`
+		CategoryDiscount float64 `json:"categoryDiscount"`
+	}
+
+	if err := ctx.BodyParser(&req); err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	if len(req) == 0 {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "empty products list",
+		})
+	}
+
+	products := make([]model.ProductCreateInput, 0, len(req))
+	for _, item := range req {
+		if strings.TrimSpace(item.Name) == "" {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "product name is required",
+			})
+		}
+		if item.Price < 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "product price must be non-negative",
+			})
+		}
+		if item.CategoryID <= 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "categoryId must be positive",
+			})
+		}
+		if item.PremiumDiscount < 0 || item.PremiumDiscount > 100 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "premiumDiscount must be between 0 and 100",
+			})
+		}
+		if item.CategoryDiscount < 0 || item.CategoryDiscount > 100 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "categoryDiscount must be between 0 and 100",
+			})
+		}
+
+		products = append(products, model.ProductCreateInput{
+			Name:             item.Name,
+			Description:      item.Description,
+			Price:            item.Price,
+			CategoryID:       item.CategoryID,
+			PremiumDiscount:  item.PremiumDiscount,
+			CategoryDiscount: item.CategoryDiscount,
+		})
+	}
+
+	created, err := h.usecase.CreateProducts(ctx.Context(), products)
+	if err != nil {
+		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return ctx.Status(http.StatusCreated).JSON(fiber.Map{
+		"products": created,
+	})
+}
+
+func (h *handler) UpdateProducts(ctx *fiber.Ctx) error {
+	var req []struct {
+		ID               int64   `json:"id"`
+		Name             string  `json:"name"`
+		Description      string  `json:"description"`
+		Price            float64 `json:"price"`
+		CategoryID       int64   `json:"categoryId"`
+		PremiumDiscount  float64 `json:"premiumDiscount"`
+		CategoryDiscount float64 `json:"categoryDiscount"`
+	}
+
+	if err := ctx.BodyParser(&req); err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	if len(req) == 0 {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "empty products list",
+		})
+	}
+
+	products := make([]model.ProductUpdateInput, 0, len(req))
+	for _, item := range req {
+		if item.ID <= 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "product id must be positive",
+			})
+		}
+		if strings.TrimSpace(item.Name) == "" {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "product name is required",
+			})
+		}
+		if item.Price < 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "product price must be non-negative",
+			})
+		}
+		if item.CategoryID <= 0 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "categoryId must be positive",
+			})
+		}
+		if item.PremiumDiscount < 0 || item.PremiumDiscount > 100 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "premiumDiscount must be between 0 and 100",
+			})
+		}
+		if item.CategoryDiscount < 0 || item.CategoryDiscount > 100 {
+			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "categoryDiscount must be between 0 and 100",
+			})
+		}
+
+		products = append(products, model.ProductUpdateInput{
+			ID:               item.ID,
+			Name:             item.Name,
+			Description:      item.Description,
+			Price:            item.Price,
+			CategoryID:       item.CategoryID,
+			PremiumDiscount:  item.PremiumDiscount,
+			CategoryDiscount: item.CategoryDiscount,
+		})
+	}
+
+	updated, err := h.usecase.UpdateProducts(ctx.Context(), products)
+	if err != nil {
+		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return ctx.Status(http.StatusOK).JSON(fiber.Map{
+		"products": updated,
+	})
+}
+
+func (h *handler) DeleteProduct(ctx *fiber.Ctx) error {
+	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
+	if err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid product id",
+		})
+	}
+
+	err = h.usecase.DeleteProduct(ctx.Context(), id)
+	if err != nil {
+		if err.Error() == "product not found" {
+			return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+
+		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 
 	return ctx.SendStatus(http.StatusOK)
 }
+
+
+

@@ -2,15 +2,21 @@ package model
 
 import "time"
 
-type CartItem struct {
-	ID        int64
-	CartID    int64
+type CartUpdateItem struct {
 	ProductID int64
 	Quantity  int
-	Product   *Product
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
+}
+
+type CartItem struct {
+	ID              int64
+	CartID          int64
+	ProductID       int64
+	Quantity        int
+	DiscountPercent float64
+	Product         *Product
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 type Cart struct {
