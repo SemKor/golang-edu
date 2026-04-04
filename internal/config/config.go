@@ -15,6 +15,7 @@ type Config struct {
 	Server   AuthServer `yaml:"server"`
 	Log      Log        `yaml:"log"`
 	TestUser TestUser   `yaml:"testUser"`
+	Psql      Psql       `yaml:"psql"`
 }
 
 type TestUser struct {
@@ -32,6 +33,16 @@ type Log struct {
 	Title  string `yaml:"title"`
 	Format string `yaml:"format"`
 	Level  string `yaml:"level"`
+}
+
+type Psql struct {
+	User      string   `yaml:"user"`
+	Pass      string   `yaml:"pass"`
+	Host      string   `yaml:"host"`
+	Port      int      `yaml:"port"`
+	DBName    string   `yaml:"dbname"`
+	SSLMode   string   `yaml:"sslmode"`
+	Blacklist []string `yaml:"blacklist"`
 }
 
 func Gist() *Config {

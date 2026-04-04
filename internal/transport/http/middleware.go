@@ -5,39 +5,99 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	
+
+	"task5/internal/domain"
 	"task5/internal/logger"
 )
 
-func authMiddleware(ctx *fiber.Ctx) error {
-	if ctx.Path() == "/v1/register" ||
-		ctx.Path() == "/v1/token" {
+func authMiddleware(usecase *domain.Usecase) fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		if ctx.Path() == "/v1/register" ||
+			ctx.Path() == "/v1/token" ||
+			ctx.Path() == "/v1/ping" {
+			return ctx.Next()
+		}
+
+		tokenRaw := strings.ReplaceAll(ctx.Get("authorization"), "Bearer ", "")
+		token, err := jwt.Parse(tokenRaw, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte("00000000"), nil
+		})
+		if err != nil {
+			ctx.Status(http.StatusUnauthorized)
+			return fmt.Errorf("cannot parse token: %w", err)
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok || !token.Valid {
+			ctx.Status(http.StatusUnauthorized)
+			return fmt.Errorf("invalid token")
+		}
+
+		userIDRaw := claims["sub"]
+		userIDStr, ok := userIDRaw.(string)
+		if !ok {
+			ctx.Status(http.StatusUnauthorized)
+			return fmt.Errorf("invalid token subject")
+		}
+
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
+		if err != nil {
+			ctx.Status(http.StatusUnauthorized)
+			return fmt.Errorf("invalid user id in token: %w", err)
+		}
+
+		permissions, err := usecase.GetUserPermissions(ctx.Context(), userID)
+		if err != nil {
+			ctx.Status(http.StatusForbidden)
+			return fmt.Errorf("cannot get user permissions: %w", err)
+		}
+
+		requiredPermission := buildPermission(ctx.Method(), ctx.Path())
+		if !hasPermission(permissions, requiredPermission) {
+			ctx.Status(http.StatusForbidden)
+			return fmt.Errorf("forbidden")
+		}
+
+		ctx.Locals("user_id", userIDStr)
+		ctx.Locals("permissions", permissions)
+
 		return ctx.Next()
 	}
-	tokenRaw := strings.ReplaceAll(ctx.Get("authorization"), "Bearer ", "")
-	token, err := jwt.Parse(tokenRaw, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+}
+
+func buildPermission(method, path string) string {
+	path = strings.TrimPrefix(path, "/v1")
+
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) > 1 {
+		last := parts[len(parts)-1]
+		if _, err := strconv.ParseInt(last, 10, 64); err == nil {
+			parts = parts[:len(parts)-1]
 		}
-		return []byte("00000000"), nil
-	})
-	if err != nil {
-		ctx.Status(http.StatusUnauthorized)
-		return fmt.Errorf("cannot parse token: %w", err)
 	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		fmt.Println(claims["sub"]) // Это и есть идентификатор пользователя который мы проставили в токене при его получении.
-		// TODO Далее имея идентификатор пользователя, мы должны его авторизовать, запросив его роли и права
-	} else {
-		ctx.Status(http.StatusUnauthorized)
-		return fmt.Errorf("cannot parse token: %w", err)
+
+	cleanPath := strings.Join(parts, "/")
+	return method + "/" + cleanPath
+}
+
+func hasPermission(permissions []string, required string) bool {
+	for _, permission := range permissions {
+		if permission == required {
+			return true
+		}
 	}
-	return ctx.Next()
+	return false
 }
 
 func errorMiddleware(ctx *fiber.Ctx) error {

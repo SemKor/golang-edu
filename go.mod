@@ -13,6 +13,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/spf13/viper v1.16.0
 	go.uber.org/zap v1.24.0
+	golang.org/x/crypto v0.45.0
 )
 
 require (
@@ -21,6 +22,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/klauspost/compress v1.16.3 // indirect
+	github.com/lib/pq v1.12.2 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
