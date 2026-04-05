@@ -104,8 +104,9 @@ func errorMiddleware(ctx *fiber.Ctx) error {
 	err := ctx.Next()
 	if err != nil {
 		logger.Gist(ctx.Context()).Error("error occurred while request handling", zap.Error(err))
+		return nil
 	}
-	return err
+	return nil
 }
 
 func contextualLoggerMiddleware(c *fiber.Ctx) error {
