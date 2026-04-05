@@ -8,6 +8,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"task5/internal/domain/model"
+
+	appErrors "task5/internal/errors"
 )
 
 type Usecase struct {
@@ -37,24 +39,24 @@ func NewUsecase(
 func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, error) {
 	existingUser, err := u.userRepo.GetUserByUsername(ctx, user.Username)
 	if err == nil && existingUser.ID != 0 {
-		return model.User{}, fmt.Errorf("user already exists")
+		return model.User{}, appErrors.Conflict("user already exists", nil)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		return model.User{}, fmt.Errorf("cannot hash password: %w", err)
+		return model.User{}, appErrors.Internal(err)
 	}
 
 	user.PasswordHash = string(hashedPassword)
 
 	createdUser, err := u.userRepo.CreateUser(ctx, user)
 	if err != nil {
-		return model.User{}, err
+		return model.User{}, appErrors.Internal(err)
 	}
 
 	err = u.userRepo.AssignRoleToUser(ctx, createdUser.ID, "user")
 	if err != nil {
-		return model.User{}, fmt.Errorf("cannot assign default role: %w", err)
+		return model.User{}, appErrors.Internal(err)
 	}
 
 	return createdUser, nil
@@ -63,12 +65,12 @@ func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, er
 func (u *Usecase) Login(ctx context.Context, username, password string) (string, error) {
 	user, err := u.userRepo.GetUserByUsername(ctx, username)
 	if err != nil {
-		return "", fmt.Errorf("invalid credentials")
+		return "", appErrors.Unauthorized("invalid credentials", nil)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
-		return "", fmt.Errorf("invalid credentials")
+		return "", appErrors.Unauthorized("invalid credentials", nil)
 	}
 
 	claims := jwt.MapClaims{
@@ -80,12 +82,12 @@ func (u *Usecase) Login(ctx context.Context, username, password string) (string,
 
 	token, err := tokenObj.SignedString([]byte("00000000"))
 	if err != nil {
-		return "", err
+		return "", appErrors.Internal(err)
 	}
 
 	err = u.tokenRepo.SaveToken(ctx, user.ID, token, time.Now().Add(24*time.Hour))
 	if err != nil {
-		return "", err
+		return "", appErrors.Internal(err)
 	}
 
 	return token, nil
@@ -94,7 +96,7 @@ func (u *Usecase) Login(ctx context.Context, username, password string) (string,
 func (u *Usecase) GetUserByID(ctx context.Context, id int64) (model.User, error) {
 	user, err := u.userRepo.GetUserByID(ctx, id)
 	if err != nil {
-		return model.User{}, err
+		return model.User{}, appErrors.NotFound("Пользователь не найден", err)
 	}
 
 	return user, nil
@@ -109,7 +111,12 @@ func (u *Usecase) GetProducts(ctx context.Context, filter model.ProductFilter) (
 }
 
 func (u *Usecase) GetProductByID(ctx context.Context, id int64) (model.Product, error) {
-	return u.productRepo.GetProductByID(ctx, id)
+	product, err := u.productRepo.GetProductByID(ctx, id)
+	if err != nil {
+		return model.Product{}, appErrors.NotFound("Запрашиваемого продукта не существует", err)
+	}
+
+	return product, nil
 }
 
 func (u *Usecase) GetCart(ctx context.Context, userID int64) (model.Cart, error) {

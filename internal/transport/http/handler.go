@@ -19,6 +19,8 @@ import (
 	"task5/internal/config"
 	"task5/internal/domain"
 	"task5/internal/domain/model"
+
+	appErrors "task5/internal/errors"
 )
 
 const (
@@ -61,12 +63,10 @@ func (h *handler) Ping(ctx *fiber.Ctx) error {
 func (h *handler) Token(ctx *fiber.Ctx) error {
 	params, err := url.ParseQuery(string(ctx.Body()))
 	if err != nil {
-		ctx.Status(http.StatusBadRequest)
-		return fmt.Errorf("cannot parse body: %w", err)
+		return appErrors.BadRequest("invalid request body", err)
 	}
 	if params.Get("grant_type") != oauth2.PasswordCredentials.String() {
-		ctx.Status(http.StatusBadRequest)
-		return fmt.Errorf("invalid grant type")
+		return appErrors.BadRequest("invalid grant type", nil)
 	}
 
 	username := params.Get("username")
@@ -125,39 +125,27 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
+		return appErrors.BadRequest("invalid request body", err)
 	}
 
 	if strings.TrimSpace(req.Login) == "" {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "login is required",
-		})
+		return appErrors.BadRequest("login is required", nil)
 	}
 
 	if strings.TrimSpace(req.Email) == "" {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "email is required",
-		})
+		return appErrors.BadRequest("email is required", nil)
 	}
 
 	if strings.TrimSpace(req.Password) == "" {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "password is required",
-		})
+		return appErrors.BadRequest("password is required", nil)
 	}
 
 	if strings.TrimSpace(req.FirstName) == "" {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "firstname is required",
-		})
+		return appErrors.BadRequest("firstname is required", nil)
 	}
 
 	if strings.TrimSpace(req.LastName) == "" {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "lastname is required",
-		})
+		return appErrors.BadRequest("lastname is required", nil)
 	}
 
 	user := model.User{
@@ -170,9 +158,7 @@ func (h *handler) Register(ctx *fiber.Ctx) error {
 
 	createdUser, err := h.usecase.Register(ctx.Context(), user)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
 	return ctx.Status(http.StatusOK).JSON(fiber.Map{
@@ -185,23 +171,17 @@ func (h *handler) GetUser(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	user, err := h.usecase.GetUserByID(ctx.Context(), id)
 	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "user not found",
-		})
+		return err
 	}
 
 	return ctx.Status(http.StatusOK).JSON(fiber.Map{
@@ -216,23 +196,17 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	user, err := h.usecase.GetUserByID(ctx.Context(), userID)
 	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "user not found",
-		})
+		return err
 	}
 
 	var filter model.ProductFilter
@@ -245,9 +219,7 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 		for _, p := range parts {
 			id, err := strconv.ParseInt(strings.TrimSpace(p), 10, 64)
 			if err != nil {
-				return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-					"error": "invalid category",
-				})
+				return appErrors.BadRequest("invalid category", err)
 			}
 			filter.Category = append(filter.Category, id)
 		}
@@ -256,9 +228,7 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 	if v := strings.TrimSpace(ctx.Query("minPrice")); v != "" {
 		val, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid minPrice",
-			})
+			return appErrors.BadRequest("invalid minPrice", err)
 		}
 		filter.MinPrice = val
 	}
@@ -266,9 +236,7 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 	if v := strings.TrimSpace(ctx.Query("maxPrice")); v != "" {
 		val, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid maxPrice",
-			})
+			return appErrors.BadRequest("invalid maxPrice", err)
 		}
 		filter.MaxPrice = val
 	}
@@ -277,9 +245,7 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 	if v := strings.TrimSpace(ctx.Query("minDiscount")); v != "" {
 		val, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid minDiscount",
-			})
+			return appErrors.BadRequest("invalid minDiscount", err)
 		}
 		minDiscount = &val
 	}
@@ -288,9 +254,7 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 	if v := strings.TrimSpace(ctx.Query("maxDiscount")); v != "" {
 		val, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid maxDiscount",
-			})
+			return appErrors.BadRequest("invalid maxDiscount", err)
 		}
 		maxDiscount = &val
 	}
@@ -299,9 +263,7 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 	if v := strings.TrimSpace(ctx.Query("offset")); v != "" {
 		val, err := strconv.Atoi(v)
 		if err != nil || val < 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid offset",
-			})
+			return appErrors.BadRequest("invalid offset", err)
 		}
 		offset = val
 	}
@@ -310,24 +272,17 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 	if v := strings.TrimSpace(ctx.Query("count")); v != "" {
 		val, err := strconv.Atoi(v)
 		if err != nil || val < 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid count",
-			})
+			return appErrors.BadRequest("invalid count", err)
 		}
 		count = val
 	}
 
-	// Важно:
-	// offset/count здесь не передаем в repository, чтобы totalCount считался
-	// после применения discount-фильтров, а пагинация была последним шагом.
 	filter.Offset = 0
 	filter.Count = 0
 
 	products, _, err := h.usecase.GetProducts(ctx.Context(), filter)
 	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "cannot get products",
-		})
+		return appErrors.Internal(err)
 	}
 
 	type productResponse struct {
@@ -343,9 +298,7 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 	for _, product := range products {
 		discount, err := h.usecase.GetProductDiscount(ctx.Context(), product.ID, user.IsPremium)
 		if err != nil {
-			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-				"error": "cannot get product discount",
-			})
+			return appErrors.Internal(err)
 		}
 
 		if minDiscount != nil && discount < *minDiscount {
@@ -387,45 +340,33 @@ func (h *handler) GetProducts(ctx *fiber.Ctx) error {
 func (h *handler) GetProductByID(ctx *fiber.Ctx) error {
 	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid product id",
-		})
+		return appErrors.BadRequest("invalid product id", err)
 	}
 
 	product, err := h.usecase.GetProductByID(ctx.Context(), id)
 	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "product not found",
-		})
+		return err
 	}
 
 	userIDRaw := ctx.Locals("user_id")
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	user, err := h.usecase.GetUserByID(ctx.Context(), userID)
 	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "user not found",
-		})
+		return err
 	}
 
 	discount, err := h.usecase.GetProductDiscount(ctx.Context(), product.ID, user.IsPremium)
 	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "cannot get product discount",
-		})
+		return appErrors.Internal(err)
 	}
 
 	finalPrice := product.Price * (1 - discount/100)
@@ -448,16 +389,12 @@ func (h *handler) ReplaceCart(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	var req struct {
@@ -468,22 +405,16 @@ func (h *handler) ReplaceCart(ctx *fiber.Ctx) error {
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid body",
-		})
+		return appErrors.BadRequest("invalid body", err)
 	}
 
 	items := make([]model.CartUpdateItem, 0, len(req.Products))
 	for _, product := range req.Products {
 		if product.ID <= 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid product id",
-			})
+			return appErrors.BadRequest("invalid product id", nil)
 		}
 		if product.Quantity <= 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid quantity",
-			})
+			return appErrors.BadRequest("invalid quantity", nil)
 		}
 
 		items = append(items, model.CartUpdateItem{
@@ -494,9 +425,7 @@ func (h *handler) ReplaceCart(ctx *fiber.Ctx) error {
 
 	err = h.usecase.ReplaceCart(ctx.Context(), userID, items)
 	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return appErrors.Internal(err)
 	}
 
 	return ctx.SendStatus(http.StatusOK)
@@ -507,23 +436,17 @@ func (h *handler) GetCart(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	cart, err := h.usecase.GetCart(ctx.Context(), userID)
 	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "cart not found",
-		})
+		return appErrors.NotFound("cart not found", err)
 	}
 
 	type cartProductResponse struct {
@@ -567,16 +490,12 @@ func (h *handler) CreateOrder(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	var req struct {
@@ -584,28 +503,20 @@ func (h *handler) CreateOrder(ctx *fiber.Ctx) error {
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid body",
-		})
+		return appErrors.BadRequest("invalid body", err)
 	}
 
 	if strings.TrimSpace(req.Address) == "" {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "address is required",
-		})
+		return appErrors.BadRequest("address is required", nil)
 	}
 
 	order, err := h.usecase.CreateOrder(ctx.Context(), userID, req.Address)
 	if err != nil {
 		switch err.Error() {
 		case "cart not found", "cart is empty":
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.BadRequest(err.Error(), err)
 		default:
-			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.Internal(err)
 		}
 	}
 
@@ -619,30 +530,22 @@ func (h *handler) GetOrder(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	orderID, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid id",
-		})
+		return appErrors.BadRequest("invalid id", err)
 	}
 
 	order, err := h.usecase.GetOrderByIDForUser(ctx.Context(), orderID, userID)
 	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "order not found",
-		})
+		return appErrors.NotFound("order not found", err)
 	}
 
 	type orderProductResponse struct {
@@ -684,23 +587,17 @@ func (h *handler) GetOrders(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	orders, err := h.usecase.GetOrdersByUser(ctx.Context(), userID)
 	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "cannot get orders",
-		})
+		return appErrors.Internal(err)
 	}
 
 	type orderResponse struct {
@@ -726,16 +623,12 @@ func (h *handler) PayOrder(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	var req struct {
@@ -745,36 +638,26 @@ func (h *handler) PayOrder(ctx *fiber.Ctx) error {
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid body",
-		})
+		return appErrors.BadRequest("invalid body", err)
 	}
 
 	if req.Amount < 0 {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid amount",
-		})
+		return appErrors.BadRequest("invalid amount", nil)
 	}
 
 	switch req.PaymentType {
 	case "order":
 		if req.OrderID <= 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid order_id",
-			})
+			return appErrors.BadRequest("invalid order_id", nil)
 		}
 
 		order, err := h.usecase.GetOrderByIDForUser(ctx.Context(), req.OrderID, userID)
 		if err != nil {
-			return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-				"error": "order not found",
-			})
+			return appErrors.NotFound("order not found", err)
 		}
 
 		if order.Status == "cancelled" {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "cancelled order cannot be paid",
-			})
+			return appErrors.BadRequest("cancelled order cannot be paid", nil)
 		}
 
 		if order.Status == "paid" {
@@ -782,46 +665,34 @@ func (h *handler) PayOrder(ctx *fiber.Ctx) error {
 		}
 
 		if req.Amount != order.TotalPrice {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid payment amount",
-			})
+			return appErrors.BadRequest("invalid payment amount", nil)
 		}
 
 		err = h.usecase.PayOrder(ctx.Context(), req.OrderID)
 		if err != nil {
-			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.Internal(err)
 		}
 
 		return ctx.SendStatus(http.StatusOK)
 
 	case "premium":
 		if req.Amount <= 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid amount",
-			})
+			return appErrors.BadRequest("invalid amount", nil)
 		}
 
 		err := h.usecase.ActivatePremium(ctx.Context(), userID)
 		if err != nil {
 			if err.Error() == "user not found" {
-				return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-					"error": err.Error(),
-				})
+				return appErrors.NotFound("user not found", err)
 			}
 
-			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.Internal(err)
 		}
 
 		return ctx.SendStatus(http.StatusOK)
 
 	default:
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid paymentType",
-		})
+		return appErrors.BadRequest("invalid paymentType", nil)
 	}
 }
 
@@ -830,40 +701,28 @@ func (h *handler) CancelOrder(ctx *fiber.Ctx) error {
 
 	idStr, ok := userIDRaw.(string)
 	if !ok {
-		return ctx.Status(http.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid token",
-		})
+		return appErrors.Unauthorized("invalid token", nil)
 	}
 
 	userID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid user id",
-		})
+		return appErrors.BadRequest("invalid user id", err)
 	}
 
 	orderID, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid order id",
-		})
+		return appErrors.BadRequest("invalid order id", err)
 	}
 
 	err = h.usecase.CancelOrder(ctx.Context(), orderID, userID)
 	if err != nil {
 		switch err.Error() {
 		case "order not found":
-			return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.NotFound("order not found", err)
 		case "paid order cannot be cancelled":
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.BadRequest("paid order cannot be cancelled", err)
 		default:
-			return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.Internal(err)
 		}
 	}
 
@@ -881,43 +740,29 @@ func (h *handler) CreateProducts(ctx *fiber.Ctx) error {
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
+		return appErrors.BadRequest("invalid request body", err)
 	}
 
 	if len(req) == 0 {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "empty products list",
-		})
+		return appErrors.BadRequest("empty products list", nil)
 	}
 
 	products := make([]model.ProductCreateInput, 0, len(req))
 	for _, item := range req {
 		if strings.TrimSpace(item.Name) == "" {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "product name is required",
-			})
+			return appErrors.BadRequest("product name is required", nil)
 		}
 		if item.Price < 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "product price must be non-negative",
-			})
+			return appErrors.BadRequest("product price must be non-negative", nil)
 		}
 		if item.CategoryID <= 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "categoryId must be positive",
-			})
+			return appErrors.BadRequest("categoryId must be positive", nil)
 		}
 		if item.PremiumDiscount < 0 || item.PremiumDiscount > 100 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "premiumDiscount must be between 0 and 100",
-			})
+			return appErrors.BadRequest("premiumDiscount must be between 0 and 100", nil)
 		}
 		if item.CategoryDiscount < 0 || item.CategoryDiscount > 100 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "categoryDiscount must be between 0 and 100",
-			})
+			return appErrors.BadRequest("categoryDiscount must be between 0 and 100", nil)
 		}
 
 		products = append(products, model.ProductCreateInput{
@@ -932,16 +777,13 @@ func (h *handler) CreateProducts(ctx *fiber.Ctx) error {
 
 	created, err := h.usecase.CreateProducts(ctx.Context(), products)
 	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return appErrors.Internal(err)
 	}
 
 	return ctx.Status(http.StatusCreated).JSON(fiber.Map{
 		"products": created,
 	})
 }
-
 func (h *handler) UpdateProducts(ctx *fiber.Ctx) error {
 	var req []struct {
 		ID               int64   `json:"id"`
@@ -954,48 +796,32 @@ func (h *handler) UpdateProducts(ctx *fiber.Ctx) error {
 	}
 
 	if err := ctx.BodyParser(&req); err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
+		return appErrors.BadRequest("invalid request body", err)
 	}
 
 	if len(req) == 0 {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "empty products list",
-		})
+		return appErrors.BadRequest("empty products list", nil)
 	}
 
 	products := make([]model.ProductUpdateInput, 0, len(req))
 	for _, item := range req {
 		if item.ID <= 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "product id must be positive",
-			})
+			return appErrors.BadRequest("product id must be positive", nil)
 		}
 		if strings.TrimSpace(item.Name) == "" {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "product name is required",
-			})
+			return appErrors.BadRequest("product name is required", nil)
 		}
 		if item.Price < 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "product price must be non-negative",
-			})
+			return appErrors.BadRequest("product price must be non-negative", nil)
 		}
 		if item.CategoryID <= 0 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "categoryId must be positive",
-			})
+			return appErrors.BadRequest("categoryId must be positive", nil)
 		}
 		if item.PremiumDiscount < 0 || item.PremiumDiscount > 100 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "premiumDiscount must be between 0 and 100",
-			})
+			return appErrors.BadRequest("premiumDiscount must be between 0 and 100", nil)
 		}
 		if item.CategoryDiscount < 0 || item.CategoryDiscount > 100 {
-			return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-				"error": "categoryDiscount must be between 0 and 100",
-			})
+			return appErrors.BadRequest("categoryDiscount must be between 0 and 100", nil)
 		}
 
 		products = append(products, model.ProductUpdateInput{
@@ -1011,9 +837,7 @@ func (h *handler) UpdateProducts(ctx *fiber.Ctx) error {
 
 	updated, err := h.usecase.UpdateProducts(ctx.Context(), products)
 	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return appErrors.Internal(err)
 	}
 
 	return ctx.Status(http.StatusOK).JSON(fiber.Map{
@@ -1024,26 +848,16 @@ func (h *handler) UpdateProducts(ctx *fiber.Ctx) error {
 func (h *handler) DeleteProduct(ctx *fiber.Ctx) error {
 	id, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
-		return ctx.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid product id",
-		})
+		return appErrors.BadRequest("invalid product id", err)
 	}
 
 	err = h.usecase.DeleteProduct(ctx.Context(), id)
 	if err != nil {
 		if err.Error() == "product not found" {
-			return ctx.Status(http.StatusNotFound).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return appErrors.NotFound("product not found", err)
 		}
-
-		return ctx.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return appErrors.Internal(err)
 	}
 
 	return ctx.SendStatus(http.StatusOK)
 }
-
-
-

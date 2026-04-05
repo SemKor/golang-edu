@@ -56,7 +56,7 @@ func Test_IfRegisterWithValidBody_ShouldCreateUser(t *testing.T) {
 func Test_IfRegisterWithoutLogin_ShouldReturnBadRequest(t *testing.T) {
 	e := httpexpect.Default(t, testServerURL)
 
-	e.POST("/v1/register").
+	obj := e.POST("/v1/register").
 		WithJSON(map[string]interface{}{
 			"login":     "",
 			"email":     "user_register_2@test.com",
@@ -67,10 +67,10 @@ func Test_IfRegisterWithoutLogin_ShouldReturnBadRequest(t *testing.T) {
 		Expect().
 		Status(http.StatusBadRequest).
 		JSON().
-		Object().
-		Value("error").
-		String().
-		IsEqual("login is required")
+		Object()
+
+	obj.Value("code").String().IsEqual("BadRequest")
+	obj.Value("message").String().IsEqual("login is required")
 }
 
 func Test_IfGetUserWithoutToken_ShouldReturnUnauthorized(t *testing.T) {
@@ -195,7 +195,7 @@ func Test_IfCreateOrderWithoutAddress_ShouldReturnBadRequest(t *testing.T) {
 	e := httpexpect.Default(t, testServerURL)
 	token := getTestToken(t)
 
-	e.POST("/v1/order").
+	obj := e.POST("/v1/order").
 		WithHeader("Authorization", "Bearer "+token).
 		WithJSON(map[string]interface{}{
 			"address": "",
@@ -203,10 +203,10 @@ func Test_IfCreateOrderWithoutAddress_ShouldReturnBadRequest(t *testing.T) {
 		Expect().
 		Status(http.StatusBadRequest).
 		JSON().
-		Object().
-		Value("error").
-		String().
-		IsEqual("address is required")
+		Object()
+
+	obj.Value("code").String().IsEqual("BadRequest")
+	obj.Value("message").String().IsEqual("address is required")
 }
 
 func Test_IfGetOrdersWithoutToken_ShouldReturnUnauthorized(t *testing.T) {
@@ -269,7 +269,7 @@ func Test_IfPayWithInvalidPaymentType_ShouldReturnBadRequest(t *testing.T) {
 	e := httpexpect.Default(t, testServerURL)
 	token := getTestToken(t)
 
-	e.POST("/v1/pay").
+	obj := e.POST("/v1/pay").
 		WithHeader("Authorization", "Bearer "+token).
 		WithJSON(map[string]interface{}{
 			"paymentType": "unknown",
@@ -278,17 +278,17 @@ func Test_IfPayWithInvalidPaymentType_ShouldReturnBadRequest(t *testing.T) {
 		Expect().
 		Status(http.StatusBadRequest).
 		JSON().
-		Object().
-		Value("error").
-		String().
-		IsEqual("invalid paymentType")
+		Object()
+
+	obj.Value("code").String().IsEqual("BadRequest")
+	obj.Value("message").String().IsEqual("invalid paymentType")
 }
 
 func Test_IfPayPremiumWithInvalidAmount_ShouldReturnBadRequest(t *testing.T) {
 	e := httpexpect.Default(t, testServerURL)
 	token := getTestToken(t)
 
-	e.POST("/v1/pay").
+	obj := e.POST("/v1/pay").
 		WithHeader("Authorization", "Bearer "+token).
 		WithJSON(map[string]interface{}{
 			"paymentType": "premium",
@@ -297,10 +297,10 @@ func Test_IfPayPremiumWithInvalidAmount_ShouldReturnBadRequest(t *testing.T) {
 		Expect().
 		Status(http.StatusBadRequest).
 		JSON().
-		Object().
-		Value("error").
-		String().
-		IsEqual("invalid amount")
+		Object()
+
+	obj.Value("code").String().IsEqual("BadRequest")
+	obj.Value("message").String().IsEqual("invalid amount")
 }
 
 func Test_IfCreateProductsWithoutToken_ShouldReturnUnauthorized(t *testing.T) {
@@ -349,4 +349,3 @@ func Test_IfDeleteProductWithInvalidID_ShouldReturnForbidden(t *testing.T) {
 		Expect().
 		Status(http.StatusForbidden)
 }
-

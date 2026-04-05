@@ -2,17 +2,17 @@ package http
 
 import (
 	"fmt"
-	"net/http"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	
+	stderrors "errors"
+	appErrors "task5/internal/errors"
 
 	"task5/internal/domain"
 	"task5/internal/logger"
@@ -34,39 +34,33 @@ func authMiddleware(usecase *domain.Usecase) fiber.Handler {
 			return []byte("00000000"), nil
 		})
 		if err != nil {
-			ctx.Status(http.StatusUnauthorized)
-			return fmt.Errorf("cannot parse token: %w", err)
+			return appErrors.Unauthorized("invalid token", err)
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok || !token.Valid {
-			ctx.Status(http.StatusUnauthorized)
-			return fmt.Errorf("invalid token")
+			return appErrors.Unauthorized("invalid token", nil)
 		}
 
 		userIDRaw := claims["sub"]
 		userIDStr, ok := userIDRaw.(string)
 		if !ok {
-			ctx.Status(http.StatusUnauthorized)
-			return fmt.Errorf("invalid token subject")
+			return appErrors.Unauthorized("invalid token", nil)
 		}
 
 		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
-			ctx.Status(http.StatusUnauthorized)
-			return fmt.Errorf("invalid user id in token: %w", err)
+			return appErrors.Unauthorized("invalid token", err)
 		}
 
 		permissions, err := usecase.GetUserPermissions(ctx.Context(), userID)
 		if err != nil {
-			ctx.Status(http.StatusForbidden)
-			return fmt.Errorf("cannot get user permissions: %w", err)
+			return appErrors.Forbidden("forbidden", err)
 		}
 
 		requiredPermission := buildPermission(ctx.Method(), ctx.Path())
 		if !hasPermission(permissions, requiredPermission) {
-			ctx.Status(http.StatusForbidden)
-			return fmt.Errorf("forbidden")
+			return appErrors.Forbidden("forbidden", nil)
 		}
 
 		ctx.Locals("user_id", userIDStr)
@@ -102,11 +96,35 @@ func hasPermission(permissions []string, required string) bool {
 
 func errorMiddleware(ctx *fiber.Ctx) error {
 	err := ctx.Next()
-	if err != nil {
-		logger.Gist(ctx.Context()).Error("error occurred while request handling", zap.Error(err))
+	if err == nil {
 		return nil
 	}
-	return nil
+
+	var appErr *appErrors.Error
+	if !stderrors.As(err, &appErr) {
+		appErr = appErrors.Internal(err)
+	}
+
+	fields := []zap.Field{
+		zap.String("code", string(appErr.Code)),
+		zap.String("message", appErr.Message),
+		zap.Int("http_status", appErr.HTTPStatus),
+	}
+
+	if appErr.Err != nil {
+		fields = append(fields, zap.Error(appErr.Err))
+	}
+
+	if len(appErr.Stack) > 0 {
+		fields = append(fields, zap.Any("stack", appErr.Stack))
+	}
+
+	logger.Gist(ctx.Context()).Error("error occurred while request handling", fields...)
+
+	return ctx.Status(appErr.HTTPStatus).JSON(fiber.Map{
+		"code":    appErr.Code,
+		"message": appErr.Message,
+	})
 }
 
 func contextualLoggerMiddleware(c *fiber.Ctx) error {
