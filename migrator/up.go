@@ -30,7 +30,7 @@ func Up(conn *pgx.Conn, dir string) {
 		if m.Version > current {
 			ApplyMigration(conn, m.UpFile)
 
-			// обновляем версию в таблице
+			
 			_, err := conn.Exec(context.Background(), "INSERT INTO go_migrations (version) VALUES($1)", m.Version)
 			if err != nil {
 				log.Fatal("Failed to update version:", err)

@@ -25,6 +25,6 @@ func Connect(cfg *config.Config) *pgx.Conn {
 		log.Fatal("Unable to connect to database:", err)
 	}
 
-	fmt.Println("✅ Successfully connected to PostgreSQL!")
+	fmt.Println("Successfully connected to PostgreSQL!")
 	return conn
 }
